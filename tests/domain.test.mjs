@@ -1,0 +1,11 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {isEligible,buildWeek,ingredientList} from '../app/domain.ts';
+import {recipes} from '../app/recipes.ts';
+const settings={allergens:[],equipment:'Stovetop',maxTime:30,servings:1,factor:1,budget:100};
+test('a generated week excludes every recipe containing a declared allergen',()=>{const p={...settings,allergens:['Gluten','Sesame','Soy']};const result=buildWeek(recipes,p);assert.ok(result.plan.length>0);for(const meal of result.plan){const r=recipes.find(r=>r.id===meal.recipe);assert.equal(r.allergens.some(a=>p.allergens.includes(a)),false)}});
+test('no-cook users never receive stove recipes or a fabricated complete week',()=>{const result=buildWeek(recipes,{...settings,equipment:'No-cook'});assert.equal(result.plan.length,7);assert.ok(result.plan.every(p=>recipes.find(r=>r.id===p.recipe).equipment==='No-cook'));});
+test('an insufficient budget returns no over-budget plan',()=>{const result=buildWeek(recipes,{...settings,budget:1});assert.equal(result.plan.length,0);assert.match(result.error,/budget/)});
+test('household servings and repeated meals combine shopping quantities correctly',()=>{const list=ingredientList([{day:0,slot:'Breakfast',recipe:2,servings:2},{day:1,slot:'Breakfast',recipe:2,servings:3}],recipes);assert.equal(list.find(i=>i.name==='Rolled oats').amount,250);assert.equal(list.find(i=>i.name==='Oat milk').amount,1000);assert.equal(list.length,4)});
+test('incompatible time settings return a useful empty result',()=>{const result=buildWeek(recipes,{...settings,maxTime:1});assert.equal(result.plan.length,0);assert.match(result.error,/restrictions/)});
+test('local cost multiplier participates in budget checks',()=>{const result=buildWeek(recipes,{...settings,factor:100,budget:100});assert.equal(result.plan.length,0);assert.match(result.error,/budget/)});
